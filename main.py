@@ -9,8 +9,8 @@ import network
 from pycm import ConfusionMatrix
 
 
-EPOCHS_COUNT = 5
-BATCH_SIZE = 1024
+EPOCHS_COUNT = 100
+BATCH_SIZE = 256
 LEARNING_RATE = 0.00005
 TOTAL_IDENTITIES = 10177
 CELEBA_DATASET_PATH = "~/Datasets/PyTorch"
@@ -46,8 +46,9 @@ def initialize_dataset(dataset_path=CELEBA_DATASET_PATH):
 	global train_loader
 	global validation_loader
 	dataset = torchvision.datasets.CelebA(dataset_path, target_type=["identity"], transform=torchvision.transforms.ToTensor())
-	train_loader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4)
-	validation_loader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4)
+	# dataset = [full_dataset[i] for i in range(25000)]
+	train_loader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
+	validation_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True)
 
 
 def validate():
@@ -56,20 +57,27 @@ def validate():
 	input_labels = []
 	predicted_labels = []
 	model.eval()
+	total_true_positives = 0
+	validation_dataset_size = 0
 	with torch.no_grad():
-		for batch_index, (data, target) in validation_loader:
-			data, target = data.to(device), target.to(device)
-			network_output = model(get_identities_tensor(target).to(device))
-			network_output_index = int(network_output.argmax(dim=0, keepdim=False))
+		for batch_index, (data, target) in enumerate(validation_loader):
+			if batch_index >= 10000:
+				break
+			data, target = data.to(device), int(target.to(device)) - 1
+			network_output = model(data)[0]
+			network_output_index = int(network_output.argmax())
 			if network_output_index == target:
 				total_true_positives += 1
-			input_labels.append(int(data))
+			input_labels.append(target)
 			predicted_labels.append(network_output_index)
+			validation_dataset_size += 1
+	accuracy = total_true_positives / validation_dataset_size
+	print("Accuracy:", accuracy)
 
 
 def print_confusion_matrix(input_labels, predicted_labels):
 	cm = ConfusionMatrix(input_labels, predicted_labels)
-	print(cm)
+	# print(cm)
 
 
 def train_all(epochs_count=EPOCHS_COUNT, batch_size=BATCH_SIZE):
@@ -79,10 +87,12 @@ def train_all(epochs_count=EPOCHS_COUNT, batch_size=BATCH_SIZE):
 		batches_count = 0
 		print("Epoch number", i + 1, "start")
 		for batch_index, (data, target) in enumerate(train_loader):
+			if batch_index % 10 == 0:
+				print("batch_index:", batch_index)
 			data, target = data.to(device), target.to(device)
 			network_output = model(data)
 			optimizer.zero_grad()
-			loss_value = network.loss(network_output, get_batch_identities_tensor(target))
+			loss_value = network.loss(network_output.to(device), get_batch_identities_tensor(target).to(device))
 			training_loss += loss_value.item()
 			loss_value.backward()
 			optimizer.step()
@@ -90,7 +100,7 @@ def train_all(epochs_count=EPOCHS_COUNT, batch_size=BATCH_SIZE):
 		training_loss /= batches_count
 		print("Epoch number", i + 1, "end")
 		print("Training loss:", training_loss)
-		# validate()
+		validate()
 		print("---------------------")
 
 

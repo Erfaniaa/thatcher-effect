@@ -13,8 +13,8 @@ class Network(nn.Module):
 		self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=2)
 		self.conv3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=2)
 		self.dropout1 = nn.Dropout2d(0.1)
-		self.fc1 = nn.Linear(17472, 14000)
-		self.fc2 = nn.Linear(14000, 10177)
+		self.fc1 = nn.Linear(17472, 10177)
+		# self.fc2 = nn.Linear(14000, 10177)
 
 	def forward(self, x):
 		x = self.conv1(x)
@@ -23,14 +23,15 @@ class Network(nn.Module):
 		x = F.relu(x)
 		x = self.conv3(x)
 		x = F.relu(x)
-		x = self.dropout1(x)
+		# x = self.dropout1(x)
 		x = torch.flatten(x, 1)
 		x = self.fc1(x)
-		x = F.relu(x)
-		x = self.dropout1(x)
-		x = self.fc2(x)
-		output = F.log_softmax(x, dim=1)
-		return output
+		# x = F.relu(x)
+		# x = self.dropout1(x)
+		# x = self.fc2(x)
+		# x = F.softmax(x)
+		x = torch.tanh(x)
+		return x
 
 
 def normal_init(m, mean, std):
